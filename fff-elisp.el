@@ -4,12 +4,10 @@
 
 ;; Author: Noah Friedman <friedman@splode.com>
 ;; Maintainer: friedman@splode.com
-;; Status: Works in Emacs 19 or later and XEmacs 19.15 or later.
-;;         Works in XEmacs 19.14 & earlier with reduced functionality.
 ;; Keywords: extensions, searching, files, commands, tools
 ;; Created: 1996-03-26; split from fff.el 1999-10-28
 
-;; $Id: fff-elisp.el,v 1.8 2005/05/17 07:05:07 friedman Exp $
+;; $Id: fff-elisp.el,v 1.9 2013/04/19 20:09:05 friedman Exp $
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -22,9 +20,7 @@
 ;; GNU General Public License for more details.
 ;;
 ;; You should have received a copy of the GNU General Public License
-;; along with this program; if not, you can either send email to this
-;; program's maintainer or write to: The Free Software Foundation,
-;; Inc.; 59 Temple Place, Suite 330; Boston, MA 02111-1307, USA.
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -56,7 +52,7 @@
 (require 'fff)
 
 (defvar fff-emacs-lisp-def-regexp
- "^\\s-*(\\s-*def\\S-+\\s-+'?\\(%s\\)\\(\\s-\\|$\\)"
+  "^\\s-*(\\s-*def[-\\S-]+\\s-+'?\\(%s\\)\\(\\s-\\|$\\)"
   "The regexp used to find symbol definitions in an emacs lisp source file.
 This regexp must contain a `%s' where the symbol name is to be inserted in
 the template.
