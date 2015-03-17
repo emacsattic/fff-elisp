@@ -7,7 +7,7 @@
 ;; Keywords: extensions, searching, files, commands, tools
 ;; Created: 1996-03-26; split from fff.el 1999-10-28
 
-;; $Id: fff-elisp.el,v 1.9 2013/04/19 20:09:05 friedman Exp $
+;; $Id: fff-elisp.el,v 1.10 2015/02/07 20:51:40 friedman Exp $
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -59,12 +59,22 @@ the template.
 If \\\(\\\) registers are included in the regular expression so that \\1
 matches, point will be positioned at that match instead of \\0.")
 
+(defvar fff-emacs-lisp-subr-regexp "^\\s-*DEFUN\\s-*(\\s-*\"%s\""
+    "The regexp used to find function definitions in an emacs C source file.
+This regexp must contain a `%s' where the symbol name is to be inserted in
+the template.
+If \\\(\\\) registers are included in the regular expression so that \\1
+matches, point will be positioned at that match instead of \\0.")
+
 (defvar fff-emacs-lisp-library-completion-table nil
   "Used by `fff-elisp-complete-emacs-lisp-library' to cache completions.
 That function resets this variable if load-path changes.  However, it
 will not be updated automatically if libraries are added to existing
 directories.  Use `fff-elisp-flush-library-completion-table' to reset the
 cache.")
+
+(defconst fff-emacs-library-suffixes
+  '(".el" ".el.gz" ".elc" ".elc.gz" ".gz" ""))
 
 
 ;;;###autoload
@@ -107,7 +117,8 @@ instead of being visited in another buffer."
                                'insert-file (interactive-p)))
 
 (defun fff-<op>-emacs-lisp-library (lib &optional which pred op interactivep)
-  (let ((file (fff-locate-emacs-lisp-library lib which pred '(".el" "")))
+  (let ((file (fff-locate-emacs-lisp-library lib which pred
+                                             fff-emacs-library-suffixes))
         (lib-sym))
     (cond ((fff-length1-p file)
            (message "%s" (car file))
@@ -164,7 +175,7 @@ e.g. '\(\".elc\" \".el\" \"\"\).  If not provided, no suffixes are tried."
                       "Locate library (fff emacs-lisp): ")
                      current-prefix-arg
                      nil
-                     '("" ".el" ".elc")))
+                     fff-emacs-library-suffixes))
   (let* ((names (if suffixes
                     (fff-suffix lib suffixes)
                   (list lib)))
@@ -211,38 +222,49 @@ This command only works in those versions of Emacs/XEmacs which have the
   (interactive (list (fff-completing-read-emacs-lisp-symbol
                       "Find function or var"
                       (fff-emacs-lisp-function-or-variable-at-point))))
-  (and (fboundp symbol)
-       (subrp (symbol-function symbol))
-       (error "%s is a primitive function" symbol))
+  (if (and (fboundp symbol)
+           (subrp (symbol-function symbol)))
+      (fff-find-emacs-subr symbol)
+    (let ((name (fff-emacs-lisp-function-loadfile symbol))
+          (srcname nil)
+          (altname nil))
+      (cond (name
+             (setq srcname (fff-emacs-lisp-bytecode-source-file-name name))
+             (save-match-data
+               (cond ((and srcname
+                           (file-exists-p srcname))
+                      (find-file srcname)
+                      (and (file-newer-than-file-p srcname name)
+                           (message "Warning: source file newer than %s"
+                                    "byte-compiled file")))
+                     ((string-match "[^/]+\\.elc" name)
+                      (setq altname (substring name 0 -1))
+                      (or (file-exists-p altname)
+                          (setq altname
+                                (car (fff-locate-emacs-lisp-library
+                                      (substring name (match-beginning 0) -1)))))
+                      (cond ((and altname
+                                  (file-exists-p altname))
+                             (find-file altname)
+                             (message "Warning: source file may not %s"
+                                      "correspond to byte-compiled file"))
+                            (t (find-file name))))
+                     (t (find-file name))))
+             (fff-emacs-lisp-goto-definition symbol))
+            (t
+             (error "%s not defined in any currently-loaded file" symbol))))))
 
-  (let ((name (fff-emacs-lisp-function-loadfile symbol))
-        (srcname nil)
-        (altname nil))
-    (cond (name
-           (setq srcname (fff-emacs-lisp-bytecode-source-file-name name))
-           (save-match-data
-             (cond ((and srcname
-                         (file-exists-p srcname))
-                    (find-file srcname)
-                    (and (file-newer-than-file-p srcname name)
-                         (message "Warning: source file newer than %s"
-                                  "byte-compiled file")))
-                   ((string-match "[^/]+\\.elc" name)
-                    (setq altname (substring name 0 -1))
-                    (or (file-exists-p altname)
-                        (setq altname
-                              (car (fff-locate-emacs-lisp-library
-                                    (substring name (match-beginning 0) -1)))))
-                    (cond ((and altname
-                                (file-exists-p altname))
-                           (find-file altname)
-                           (message "Warning: source file may not %s"
-                                    "correspond to byte-compiled file"))
-                          (t (find-file name))))
-                   (t (find-file name))))
-           (fff-emacs-lisp-goto-definition symbol))
-          (t
-           (error "%s not defined in any currently-loaded file" symbol)))))
+(defun fff-find-emacs-subr (symbol)
+  (let ((file (fff-emacs-subr-source-file-name symbol))
+        (re (format fff-emacs-lisp-subr-regexp symbol)))
+    (find-file file)
+    (save-match-data
+      (cond ((re-search-forward re nil t)
+             (if (match-beginning 1)
+                 (goto-char (match-beginning 1))
+               (goto-char (match-beginning 0))))
+            (t
+             (error "Cannot find definition of %s" symbol))))))
 
 ;; Return the name of the file the function was, or would be, loaded from.
 ;; This is not necessarily a source file; it might be an elc file.
@@ -267,8 +289,38 @@ This command only works in those versions of Emacs/XEmacs which have the
     (cond ((null name) nil)
           ((not (file-name-absolute-p name))
            (car (fff-locate-emacs-lisp-library
-                 name nil nil '("" ".el" ".elc"))))
+                 name nil nil fff-emacs-library-suffixes)))
           (t name))))
+
+;; Use information in DOC file to locate source file of subr
+(defun fff-emacs-subr-source-file (symbol)
+  (unless (or (subrp symbol)
+              (subrp (symbol-function symbol)))
+    (error (format "%s is not a subr" symbol)))
+
+  (let ((doc-file (concat doc-directory "/DOC"))
+        (name (if (subrp symbol)
+                  (subr-name symbol)
+                (symbol-name symbol)))
+        (file nil))
+    (when (file-exists-p doc-file)
+      (with-temp-buffer
+        (insert-file-contents-literally
+         (expand-file-name internal-doc-file-name doc-directory))
+        (while (null file)
+          (let ((p (search-forward (concat "\C-_F" name "\n"))))
+            (re-search-backward "\C-_S\\(.*?\\)\n")
+            (let ((obj (match-string 1)))
+              (if (member obj build-files)
+                  (setq file obj)
+                (goto-char p)))))
+        (cond ((string-match "^ns.*\\(\\.o\\)\\'" file)
+               (setq file (replace-match ".m" t t file 1)))
+              ((string-match "\\.\\(o\\|obj\\)\\'" file)
+               (setq file (replace-match ".c" t t file))))
+        (if (string-match "\\.\\(c\\|m\\)\\'" file)
+          (format "%ssrc/%s" source-directory file)
+          file)))))
 
 (defun fff-emacs-lisp-goto-definition (symbol)
   (save-match-data
@@ -349,7 +401,7 @@ This command only works in those versions of Emacs/XEmacs which have the
                 (setq name (file-name-nondirectory (car data))))
                (t
                 (setq name (car data))))
-         (setq names (fff-suffix name '("" ".el" ".elc")))
+         (setq names (fff-suffix name fff-emacs-library-suffixes))
          (cond ((null dir)
                 (car (fff-files-in-directory-list names load-path t)))
                ((file-exists-p name)
@@ -437,9 +489,9 @@ This command only works in those versions of Emacs/XEmacs which have the
     ;; Initialize table with files in load path
     (setq table (fff-file-name-completions-in-path
                  nil load-path
-                 (function (lambda (s) (string-match "\\.elc?$" s)))
+                 (function (lambda (s) (string-match "\\.elc?\\(?:\\.gz\\)?$" s)))
                  (function (lambda (s)
-                             (if (string-match "\\.elc?$" s)
+                             (if (string-match "\\.elc?\\(?:\\.gz\\)?$" s)
                                  (substring s 0 (match-beginning 0))
                                s)))))
     ;; Now add loaded features, in case they differ from file names.
@@ -455,7 +507,7 @@ This command only works in those versions of Emacs/XEmacs which have the
              (cond (file
                     (and (string-match "/" file)
                          (setq file (file-name-nondirectory file)))
-                    (and (string-match "\\.elc?$" file)
+                    (and (string-match "\\.elc?\\(?:\\.gz\\)?$" file)
                          (setq file (substring file 0 (match-beginning 0))))
 
                     (intern file table))))))
