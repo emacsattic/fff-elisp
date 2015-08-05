@@ -7,7 +7,7 @@
 ;; Keywords: extensions, searching, files, commands, tools
 ;; Created: 1996-03-26; split from fff.el 1999-10-28
 
-;; $Id: fff-elisp.el,v 1.10 2015/02/07 20:51:40 friedman Exp $
+;; $Id: fff-elisp.el,v 1.12 2015/02/17 20:18:07 friedman Exp $
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -74,7 +74,7 @@ directories.  Use `fff-elisp-flush-library-completion-table' to reset the
 cache.")
 
 (defconst fff-emacs-library-suffixes
-  '(".el" ".el.gz" ".elc" ".elc.gz" ".gz" ""))
+  '(".el" ".el.gz" ".gz" ""))
 
 
 ;;;###autoload
@@ -255,7 +255,7 @@ This command only works in those versions of Emacs/XEmacs which have the
              (error "%s not defined in any currently-loaded file" symbol))))))
 
 (defun fff-find-emacs-subr (symbol)
-  (let ((file (fff-emacs-subr-source-file-name symbol))
+  (let ((file (fff-emacs-subr-source-file symbol))
         (re (format fff-emacs-lisp-subr-regexp symbol)))
     (find-file file)
     (save-match-data
