@@ -7,7 +7,7 @@
 ;; Keywords: extensions, searching, files, commands, tools
 ;; Created: 1996-03-26; split from fff.el 1999-10-28
 
-;; $Id: fff-elisp.el,v 1.12 2015/02/17 20:18:07 friedman Exp $
+;; $Id: fff-elisp.el,v 1.13 2016/11/09 22:53:02 friedman Exp $
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -52,7 +52,7 @@
 (require 'fff)
 
 (defvar fff-emacs-lisp-def-regexp
-  "^\\s-*(\\s-*def[-\\S-]+\\s-+'?\\(%s\\)\\(\\s-\\|$\\)"
+  "^\\s-*(\\s-*def\\S-+\\s-+'?\\(%s\\)\\(\\s-\\|$\\)"
   "The regexp used to find symbol definitions in an emacs lisp source file.
 This regexp must contain a `%s' where the symbol name is to be inserted in
 the template.
