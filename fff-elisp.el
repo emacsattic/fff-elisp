@@ -7,7 +7,7 @@
 ;; Keywords: extensions, searching, files, commands, tools
 ;; Created: 1996-03-26; split from fff.el 1999-10-28
 
-;; $Id: fff-elisp.el,v 1.13 2016/11/09 22:53:02 friedman Exp $
+;; $Id: fff-elisp.el,v 1.14 2017/08/28 18:04:13 friedman Exp $
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -246,8 +246,10 @@ This command only works in those versions of Emacs/XEmacs which have the
                       (cond ((and altname
                                   (file-exists-p altname))
                              (find-file altname)
-                             (message "Warning: source file may not %s"
-                                      "correspond to byte-compiled file"))
+                             (unless (string= altname (substring name 0 -1))
+                               ;; source file was not in the same directory as elc
+                               (message "Warning: source file may not %s"
+                                        "correspond to byte-compiled file")))
                             (t (find-file name))))
                      (t (find-file name))))
              (fff-emacs-lisp-goto-definition symbol))
@@ -413,6 +415,9 @@ This command only works in those versions of Emacs/XEmacs which have the
 ;; The returned name doesn't necessarily exist; it is extracted from the
 ;; bytecode file comments.
 ;; If no name can be found, return nil.
+;;
+;; n.b. Emacs 24 and later no longer record the source file name in the
+;; compiled file.
 (defun fff-emacs-lisp-bytecode-source-file-name (elcfile)
   (let ((buf (generate-new-buffer " *emacs lisp bytecode*"))
         (magic ";ELC")
